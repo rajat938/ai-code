@@ -18,41 +18,12 @@ services:
     networks:
       - ollama-mern-network
 
-  ollama:
-    build:
-      context: ./ollama
-      dockerfile: Dockerfile
-    container_name: ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    environment:
-      # Small model = much faster on CPU. Change to llama3.2 (3B) if you have 8 GB+ RAM.
-      MODEL: qwen2.5:1.5b
-      OLLAMA_KEEP_ALIVE: 24h        # keep the model in RAM (no reload delay between prompts)
-      OLLAMA_NUM_PARALLEL: 1        # one answer at a time = less RAM, faster on CPU
-      OLLAMA_NO_CLOUD: "1"          # local only: no Ollama cloud models / online lookups
-      OLLAMA_MAX_LOADED_MODELS: 2   # chat model + the tiny (~45 MB) policy-search model
-      EMBED_MODEL: all-minilm       # used to search company policy documents by meaning
-    volumes:
-      - ollama_data:/root/.ollama
-    # Healthy only after the model has finished downloading
-    healthcheck:
-      test: ["CMD-SHELL", "test -f /tmp/ollama-ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 360
-      start_period: 30s
-    # Uncomment to use an NVIDIA GPU (needs nvidia-container-toolkit):
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-    networks:
-      - ollama-mern-network
+  # Ollama is NOT run in Docker any more.
+  # It runs directly on Windows (install from https://ollama.com/download) for full CPU speed.
+  # Download the models once in PowerShell:
+  #   ollama pull qwen2.5:1.5b
+  #   ollama pull llama3.2:3b
+  #   ollama pull all-minilm
 
   server:
     build:
@@ -64,18 +35,19 @@ services:
       - "5000:5000"
     env_file:
       - ./server/.env
-    # Inside Docker, services reach each other by service name, NOT localhost
+    # Inside Docker, services reach each other by service name, NOT localhost.
+    # host.docker.internal = the Windows PC itself, where Ollama runs.
     environment:
       MONGO_URI: mongodb://root:Admin%40123@mongodb:27017/ollama_mern?authSource=admin
-      OLLAMA_URL: http://ollama:11434
-      CLIENT_ORIGIN: http://localhost:3000
-      DEFAULT_MODEL: qwen2.5:1.5b
+      OLLAMA_URL: http://host.docker.internal:11434
+      CLIENT_ORIGIN: http://localhost:3011
+      DEFAULT_MODEL: llama3.2:3b
       EMBED_MODEL: all-minilm
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       mongodb:
         condition: service_healthy
-      ollama:
-        condition: service_started
     networks:
       - ollama-mern-network
 
@@ -86,7 +58,7 @@ services:
     container_name: client
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3011:80"
     depends_on:
       - server
     networks:
@@ -98,4 +70,3 @@ networks:
 
 volumes:
   mongodb_data:
-  ollama_data:

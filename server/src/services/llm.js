@@ -120,7 +120,15 @@ async function streamOllama({ model, messages, signal, onOpen, onText }) {
     r = await fetch(`${config.ollamaUrl}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, stream: true, keep_alive: config.keepAlive, options: ollamaOptions() }),
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+        keep_alive: config.keepAlive,
+        options: ollamaOptions(),
+        // Qwen3 models "think" before answering, which is very slow on a CPU. Turn that off.
+        ...(/^qwen3/i.test(model) ? { think: false } : {}),
+      }),
       signal,
     });
   } catch (err) {
